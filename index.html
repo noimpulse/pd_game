@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Block Bricks - игра по пд</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+
+
+    #game-container {
+      width: 100vw;
+      height: 100vh ;
+    
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      height: 98vh ;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="game-container"></div>
+
+  <script>
+    // Конфигурация игры
+    const config = {
+      type: Phaser.AUTO,
+      parent: 'game-container',
+      width: 1100,
+      height: 600,
+      backgroundColor: '#f2f2f2',
+      physics: {
+        default: 'arcade',
+        arcade: { debug: false }
+      },
+      scene: { preload, create, update }
+    };
+
+    const game = new Phaser.Game(config);
+
+    let paddle, bricks, bonuses, scoreText, livesText;
+    let score = 0, lives = 3, level = 1, balls = [], ballSpeed = 250;
+    const maxLevels = 3;
+
+     function preload() {
+      this.load.image('paddle', './img/paddle.png');
+      this.load.image('ball', './img/ball.png');
+      this.load.image('brick', './img/brick.png');
+      this.load.image('solid', './img/brick.png');
+      this.load.image('bonus', './img/sun.png');
+    }
+
+    function create() {
+
+      paddle = this.physics.add.image(config.width / 2, config.height - 30, 'paddle')
+        .setImmovable().setCollideWorldBounds(true);
+
+      spawnBall.call(this);
+
+      bricks = this.physics.add.staticGroup();
+      bonuses = this.physics.add.group();
+
+      createLevel.call(this);
+
+      scoreText = this.add.text(20, 10, 'Cчет: 0', { fontSize: '18px', fill: '#f#363636' });
+      livesText = this.add.text(config.width - 160, 10, 'Жизни: 3', { fontSize: '18px', fill: '#363636' });
+
+      this.physics.world.setBoundsCollision(true, true, true, false);
+      this.physics.add.collider(balls, bricks, hitBrick, null, this);
+      this.physics.add.collider(balls, paddle, ballHitPaddle, null, this);
+      this.physics.add.overlap(paddle, bonuses, collectBonus, null, this);
+    }
+
+    function update() {
+      paddle.x = this.input.activePointer.x;
+
+      balls.forEach((b, i) => {
+        if (b.y > config.height) {
+          b.destroy();
+          balls.splice(i, 1);
+          if (balls.length === 0) {
+            lives--;
+            livesText.setText('Жизни: ' + lives);
+            if (lives > 0) spawnBall.call(this);
+            else {
+              alert('Ты проиграл(');
+              score = 0;
+              lives = 3;
+              level = 1;
+              balls = [];
+              createLevel();
+              spawnBall.call(this);
+              scoreText.setText('Счет: ' + 0);
+              livesText.setText('Жизни ' + 3)
+
+            }
+          }
+        }
+      });
+    }
+
+    function spawnBall() {
+      const ball = this.physics.add.image(paddle.x, paddle.y - 20, 'ball');
+      ball.setCollideWorldBounds(true).setBounce(1).setVelocity(Phaser.Math.Between(-ballSpeed, ballSpeed), -ballSpeed);
+      balls.push(ball);
+      this.physics.add.collider(ball, bricks, hitBrick, null, this);
+      this.physics.add.collider(ball, paddle, ballHitPaddle, null, this);
+    }
+
+    function createLevel() {
+      bricks.clear(true, true);
+      const rows = 5 + level;
+      const cols = Math.floor(config.width / 74);
+      const offsetX = 65;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const isSolid = Phaser.Math.Between(0, 5) === 0;
+          const brick = bricks.create(offsetX + x * 74, 80 + y * 32, isSolid ? 'solid' : 'brick');
+          // Увеличиваем размеры блока
+          brick.setDisplaySize(60, 25);
+          brick.setData('solid', isSolid);
+          if (isSolid) brick.setTint(0x888888);
+        }
+      }
+    }
+
+    function hitBrick(ball, brick) {
+        if (brick.getData('solid')) return;
+
+        // Анимация исчезновения
+        this.tweens.add({
+          targets: brick,
+          scaleX: 0,
+          scaleY: 0,
+          alpha: 0,
+          duration: 200,
+          onComplete: () => {
+            brick.destroy();
+
+            score += 10;
+            scoreText.setText('Счет: ' + score);
+
+            // 10% шанс бонуса
+            if (Phaser.Math.Between(0, 9) === 0) {
+              const bonus = bonuses.create(brick.x, brick.y, 'bonus');
+              bonus.setVelocity(0, 100);
+              bonus.setData('type', Phaser.Math.Between(0, 1) === 0 ? 'ball' : 'score');
+            }
+
+            // Проверка окончания уровня
+            if (bricks.countActive() === bricks.getChildren().filter(b => b.getData('solid')).length) {
+              level++;
+              if (level > maxLevels) {
+                alert('Ты победил!');
+                location.reload();
+              } else {
+                createLevel.call(this);
+                spawnBall.call(this);
+              }
+            }
+          }
+        });
+      }
+
+    function ballHitPaddle(ball, paddle) {
+      const diff = ball.x - paddle.x;
+      ball.setVelocityX(diff * 5);
+    }
+
+    function collectBonus(paddle, bonus) {
+      if (bonus.getData('type') === 'ball') spawnBall.call(this);
+      else {
+        score += 50;
+        scoreText.setText('Счет: ' + score);
+      }
+      bonus.destroy();
+    }
+  </script>
+</body>
+
+</html>
