@@ -1,4 +1,6 @@
 # JavaScript: 2D breakout game using Phaser
+![{14432511-A351-4BE9-81A7-7F8EBBC9CDB6}](https://github.com/user-attachments/assets/50556083-789c-461b-a534-6e2283ce23d1)
+
 
 Этапы разработки:
 1. Ознокомиться с фреймворком phaser используя оффицальную документацию
